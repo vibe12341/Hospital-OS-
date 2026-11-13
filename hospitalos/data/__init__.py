@@ -1,0 +1,1 @@
+"""HospitalOS Synthetic Data Package."""

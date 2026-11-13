@@ -1,0 +1,262 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Hardened Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwnerDoc() {
+      return isVerifiedUser() && existing().ownerId == request.auth.uid;
+    }
+
+    function isImmutableCore() {
+      return incoming().ownerId == existing().ownerId
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+    }
+
+    // 1. Ward Validation Blueprint
+    function isValidWard(data) {
+      return data.keys().hasAll(['id', 'name', 'floor', 'capacity', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'floor', 'capacity', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 10000
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.floor is int && data.floor >= -5 && data.floor <= 100
+        && data.capacity is int && data.capacity >= 1 && data.capacity >= 1 && data.capacity <= 500
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /wards/{wardId} {
+      allow get: if isValidId(wardId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(wardId) && isValidWard(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(wardId) && isValidWard(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'floor', 'capacity', 'updatedAt']);
+      allow delete: if isValidId(wardId) && isOwnerDoc();
+    }
+
+    // 2. Bed Validation Blueprint
+    function isValidBed(data) {
+      return data.keys().hasAll(['id', 'bed_number', 'ward_id', 'is_occupied', 'patient_id', 'admitted_at', 'discharged_at', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'bed_number', 'ward_id', 'is_occupied', 'patient_id', 'admitted_at', 'discharged_at', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 10000
+        && data.bed_number is string && data.bed_number.size() >= 1 && data.bed_number.size() <= 40
+        && data.ward_id is int && data.ward_id >= 1 && data.ward_id <= 10000
+        && data.is_occupied is bool
+        && data.patient_id is int && data.patient_id >= 0 && data.patient_id <= 100000
+        && data.admitted_at is string && data.admitted_at.size() <= 40
+        && data.discharged_at is string && data.discharged_at.size() <= 40
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /beds/{bedId} {
+      allow get: if isValidId(bedId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(bedId) && isValidBed(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(bedId) && isValidBed(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().ward_id == existing().ward_id
+        && incoming().bed_number == existing().bed_number
+        && incoming().diff(existing()).affectedKeys().hasOnly(['is_occupied', 'patient_id', 'admitted_at', 'discharged_at', 'updatedAt']);
+      allow delete: if isValidId(bedId) && isOwnerDoc();
+    }
+
+    // 3. Patient Validation Blueprint (PII Isolated to Owner)
+    function isValidPatient(data) {
+      return data.keys().hasAll(['id', 'full_name', 'age', 'gender', 'phone', 'blood_group', 'diagnosis', 'is_admitted', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'full_name', 'age', 'gender', 'phone', 'blood_group', 'diagnosis', 'is_admitted', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 100000
+        && data.full_name is string && data.full_name.size() >= 1 && data.full_name.size() <= 100
+        && data.age is int && data.age >= 0 && data.age <= 150
+        && data.gender is string && data.gender.size() >= 1 && data.gender.size() <= 30
+        && data.phone is string && data.phone.size() >= 1 && data.phone.size() <= 30
+        && data.blood_group is string && data.blood_group.size() >= 1 && data.blood_group.size() <= 10
+        && data.diagnosis is string && data.diagnosis.size() <= 200
+        && data.is_admitted is bool
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /patients/{patientId} {
+      allow get: if isValidId(patientId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(patientId) && isValidPatient(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(patientId) && isValidPatient(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['full_name', 'age', 'phone', 'diagnosis', 'is_admitted', 'updatedAt']);
+      allow delete: if isValidId(patientId) && isOwnerDoc();
+    }
+
+    // 4. Doctor Validation Blueprint (PII Isolated to Owner)
+    function isValidDoctor(data) {
+      return data.keys().hasAll(['id', 'full_name', 'specialization', 'phone', 'ward_id', 'is_available', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'full_name', 'specialization', 'phone', 'ward_id', 'is_available', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 100000
+        && data.full_name is string && data.full_name.size() >= 1 && data.full_name.size() <= 100
+        && data.specialization is string && data.specialization.size() >= 1 && data.specialization.size() <= 100
+        && data.phone is string && data.phone.size() >= 1 && data.phone.size() <= 30
+        && data.ward_id is int && data.ward_id >= 1 && data.ward_id <= 10000
+        && data.is_available is bool
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /doctors/{doctorId} {
+      allow get: if isValidId(doctorId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(doctorId) && isValidDoctor(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(doctorId) && isValidDoctor(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['specialization', 'phone', 'ward_id', 'is_available', 'updatedAt']);
+      allow delete: if isValidId(doctorId) && isOwnerDoc();
+    }
+
+    // 5. Appointment Validation Blueprint
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['id', 'patient_id', 'doctor_id', 'appointment_time', 'status', 'notes', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'patient_id', 'doctor_id', 'appointment_time', 'status', 'notes', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 100000
+        && data.patient_id is int && data.patient_id >= 1 && data.patient_id <= 100000
+        && data.doctor_id is int && data.doctor_id >= 1 && data.doctor_id <= 100000
+        && data.appointment_time is string && data.appointment_time.size() >= 1 && data.appointment_time.size() <= 40
+        && data.status is string && data.status in ['Scheduled', 'Completed', 'Cancelled']
+        && data.notes is string && data.notes.size() <= 300
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(appointmentId) && isValidAppointment(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(appointmentId) && isValidAppointment(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().patient_id == existing().patient_id
+        && incoming().doctor_id == existing().doctor_id
+        && incoming().diff(existing()).affectedKeys().hasOnly(['appointment_time', 'status', 'notes', 'updatedAt']);
+      allow delete: if isValidId(appointmentId) && isOwnerDoc();
+    }
+
+    // 6. Medicine Validation Blueprint
+    function isValidMedicine(data) {
+      return data.keys().hasAll(['id', 'name', 'category', 'stock_quantity', 'unit_price', 'expiry_date', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'category', 'stock_quantity', 'unit_price', 'expiry_date', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 100000
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 80
+        && data.stock_quantity is int && data.stock_quantity >= 0 && data.stock_quantity <= 1000000
+        && (data.unit_price is int || data.unit_price is float) && data.unit_price >= 0 && data.unit_price <= 100000
+        && data.expiry_date is string && data.expiry_date.size() >= 1 && data.expiry_date.size() <= 20
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /medicines/{medicineId} {
+      allow get: if isValidId(medicineId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(medicineId) && isValidMedicine(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(medicineId) && isValidMedicine(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().name == existing().name
+        && incoming().category == existing().category
+        && incoming().diff(existing()).affectedKeys().hasOnly(['stock_quantity', 'unit_price', 'expiry_date', 'updatedAt']);
+      allow delete: if isValidId(medicineId) && isOwnerDoc();
+    }
+
+    // 7. LabTest Validation Blueprint
+    function isValidLabTest(data) {
+      return data.keys().hasAll(['id', 'patient_id', 'doctor_id', 'test_name', 'status', 'result', 'ordered_at', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'patient_id', 'doctor_id', 'test_name', 'status', 'result', 'ordered_at', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 100000
+        && data.patient_id is int && data.patient_id >= 1 && data.patient_id <= 100000
+        && data.doctor_id is int && data.doctor_id >= 1 && data.doctor_id <= 100000
+        && data.test_name is string && data.test_name.size() >= 1 && data.test_name.size() <= 120
+        && data.status is string && data.status in ['Pending', 'Completed']
+        && data.result is string && data.result.size() <= 300
+        && data.ordered_at is string && data.ordered_at.size() >= 1 && data.ordered_at.size() <= 40
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /lab_tests/{testId} {
+      allow get: if isValidId(testId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(testId) && isValidLabTest(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(testId) && isValidLabTest(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().patient_id == existing().patient_id
+        && incoming().doctor_id == existing().doctor_id
+        && incoming().test_name == existing().test_name
+        && incoming().ordered_at == existing().ordered_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'result', 'updatedAt']);
+      allow delete: if isValidId(testId) && isOwnerDoc();
+    }
+
+    // 8. Bill Validation Blueprint
+    function isValidBill(data) {
+      return data.keys().hasAll(['id', 'patient_id', 'total_amount', 'paid_status', 'description', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'patient_id', 'total_amount', 'paid_status', 'description', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id >= 1 && data.id <= 100000
+        && data.patient_id is int && data.patient_id >= 1 && data.patient_id <= 100000
+        && (data.total_amount is int || data.total_amount is float) && data.total_amount >= 0 && data.total_amount <= 10000000
+        && data.paid_status is string && data.paid_status in ['Unpaid', 'Partial', 'Paid']
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 300
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /bills/{billId} {
+      allow get: if isValidId(billId) && isOwnerDoc();
+      allow list: if isVerifiedUser() && resource.data.ownerId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(billId) && isValidBill(incoming())
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(billId) && isValidBill(incoming())
+        && isOwnerDoc() && isImmutableCore()
+        && incoming().patient_id == existing().patient_id
+        && incoming().diff(existing()).affectedKeys().hasOnly(['total_amount', 'paid_status', 'description', 'updatedAt']);
+      allow delete: if isValidId(billId) && isOwnerDoc();
+    }
+  }
+}

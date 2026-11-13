@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "Ward": {
+      "title": "Ward",
+      "description": "Hospital department or ward storing floor and bed capacity.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric ward identifier." },
+        "name": { "type": "string", "maxLength": 80, "minLength": 1, "description": "Ward name (e.g., ICU, General)." },
+        "floor": { "type": "integer", "description": "Building floor number." },
+        "capacity": { "type": "integer", "description": "Total beds in this ward." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID owning this hospital workspace." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "name", "floor", "capacity", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Bed": {
+      "title": "Bed",
+      "description": "Individual hospital bed inside a ward with admission and discharge timestamps.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric bed identifier." },
+        "bed_number": { "type": "string", "maxLength": 40, "minLength": 1, "description": "Bed code such as ICU-01." },
+        "ward_id": { "type": "integer", "description": "Foreign key to Ward id." },
+        "is_occupied": { "type": "boolean", "description": "Whether the bed is currently occupied." },
+        "patient_id": { "type": "integer", "description": "Foreign key to Patient id (0 when unoccupied)." },
+        "admitted_at": { "type": "string", "maxLength": 40, "description": "ISO UTC timestamp of admission or empty string." },
+        "discharged_at": { "type": "string", "maxLength": 40, "description": "ISO UTC timestamp of last discharge or empty string." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "bed_number", "ward_id", "is_occupied", "patient_id", "admitted_at", "discharged_at", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Synthetic patient record in HospitalOS.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric patient identifier." },
+        "full_name": { "type": "string", "maxLength": 100, "minLength": 1, "description": "Patient full name." },
+        "age": { "type": "integer", "description": "Patient age in years." },
+        "gender": { "type": "string", "maxLength": 30, "minLength": 1, "description": "Patient gender." },
+        "phone": { "type": "string", "maxLength": 30, "minLength": 1, "description": "Synthetic contact number." },
+        "blood_group": { "type": "string", "maxLength": 10, "minLength": 1, "description": "Blood type." },
+        "diagnosis": { "type": "string", "maxLength": 200, "description": "Primary clinical diagnosis." },
+        "is_admitted": { "type": "boolean", "description": "Whether currently admitted to a bed." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "full_name", "age", "gender", "phone", "blood_group", "diagnosis", "is_admitted", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Doctor": {
+      "title": "Doctor",
+      "description": "Hospital doctor and specialization.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric doctor identifier." },
+        "full_name": { "type": "string", "maxLength": 100, "minLength": 1, "description": "Doctor full name." },
+        "specialization": { "type": "string", "maxLength": 100, "minLength": 1, "description": "Clinical specialization." },
+        "phone": { "type": "string", "maxLength": 30, "minLength": 1, "description": "Synthetic phone number." },
+        "ward_id": { "type": "integer", "description": "Assigned ward ID." },
+        "is_available": { "type": "boolean", "description": "Whether on duty." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "full_name", "specialization", "phone", "ward_id", "is_available", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Scheduled visit between a patient and a doctor.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric appointment ID." },
+        "patient_id": { "type": "integer", "description": "Patient ID." },
+        "doctor_id": { "type": "integer", "description": "Doctor ID." },
+        "appointment_time": { "type": "string", "maxLength": 40, "minLength": 1, "description": "ISO appointment timestamp." },
+        "status": { "type": "string", "enum": ["Scheduled", "Completed", "Cancelled"], "description": "Appointment status." },
+        "notes": { "type": "string", "maxLength": 300, "description": "Clinical visit notes." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "patient_id", "doctor_id", "appointment_time", "status", "notes", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Medicine": {
+      "title": "Medicine",
+      "description": "Pharmacy medicine stock record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric medicine ID." },
+        "name": { "type": "string", "maxLength": 100, "minLength": 1, "description": "Medicine name." },
+        "category": { "type": "string", "maxLength": 80, "minLength": 1, "description": "Medicine category." },
+        "stock_quantity": { "type": "integer", "description": "Available units in stock." },
+        "unit_price": { "type": "number", "description": "Price per unit." },
+        "expiry_date": { "type": "string", "maxLength": 20, "minLength": 1, "description": "Expiry date string." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "name", "category", "stock_quantity", "unit_price", "expiry_date", "ownerId", "createdAt", "updatedAt"]
+    },
+    "LabTest": {
+      "title": "LabTest",
+      "description": "Diagnostic laboratory test ordered for a patient.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric lab test ID." },
+        "patient_id": { "type": "integer", "description": "Patient ID." },
+        "doctor_id": { "type": "integer", "description": "Ordering doctor ID." },
+        "test_name": { "type": "string", "maxLength": 120, "minLength": 1, "description": "Name of diagnostic test." },
+        "status": { "type": "string", "enum": ["Pending", "Completed"], "description": "Test completion status." },
+        "result": { "type": "string", "maxLength": 300, "description": "Test result findings." },
+        "ordered_at": { "type": "string", "maxLength": 40, "minLength": 1, "description": "ISO timestamp when ordered." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "patient_id", "doctor_id", "test_name", "status", "result", "ordered_at", "ownerId", "createdAt", "updatedAt"]
+    },
+    "Bill": {
+      "title": "Bill",
+      "description": "Patient billing invoice.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer", "description": "Numeric bill ID." },
+        "patient_id": { "type": "integer", "description": "Patient ID." },
+        "total_amount": { "type": "number", "description": "Invoice amount in USD." },
+        "paid_status": { "type": "string", "enum": ["Unpaid", "Partial", "Paid"], "description": "Payment state." },
+        "description": { "type": "string", "maxLength": 300, "minLength": 1, "description": "Summary of billed items." },
+        "ownerId": { "type": "string", "maxLength": 128, "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-]+$", "description": "Authenticated user UID." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp." }
+      },
+      "required": ["id", "patient_id", "total_amount", "paid_status", "description", "ownerId", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/wards/{wardId}": {
+      "schema": { "$ref": "#/entities/Ward" },
+      "description": "Hospital wards owned by the authenticated staff user."
+    },
+    "/beds/{bedId}": {
+      "schema": { "$ref": "#/entities/Bed" },
+      "description": "Hospital beds with admission/discharge timestamps."
+    },
+    "/patients/{patientId}": {
+      "schema": { "$ref": "#/entities/Patient" },
+      "description": "Synthetic patient records scoped to the authenticated user."
+    },
+    "/doctors/{doctorId}": {
+      "schema": { "$ref": "#/entities/Doctor" },
+      "description": "Hospital doctor records scoped to the authenticated user."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Patient-doctor appointments scoped to the authenticated user."
+    },
+    "/medicines/{medicineId}": {
+      "schema": { "$ref": "#/entities/Medicine" },
+      "description": "Pharmacy medicine stock scoped to the authenticated user."
+    },
+    "/lab_tests/{testId}": {
+      "schema": { "$ref": "#/entities/LabTest" },
+      "description": "Diagnostic lab test records scoped to the authenticated user."
+    },
+    "/bills/{billId}": {
+      "schema": { "$ref": "#/entities/Bill" },
+      "description": "Patient billing invoices scoped to the authenticated user."
+    }
+  }
+}

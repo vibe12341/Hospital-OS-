@@ -1,0 +1,23 @@
+# Environment variables and secrets (NEVER commit .env to Git)
+.env
+.env.*
+!.env.example
+
+# SQLite database files (contains synthetic hospital records)
+*.db
+*.sqlite
+*.sqlite3
+hospitalos.db
+
+# Python bytecode and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store

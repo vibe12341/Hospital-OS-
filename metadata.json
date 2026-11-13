@@ -1,0 +1,6 @@
+{
+  "name": "HospitalOS — AI Hospital Management & MCP Platform",
+  "description": "Open-source AI hospital management platform with FastAPI, SQLAlchemy (SQLite/PostgreSQL), and Model Context Protocol (MCP) tool servers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
